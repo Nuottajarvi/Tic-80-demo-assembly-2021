@@ -1,11 +1,13 @@
-function draw_sprite(xpos, ypos, w, h, spr_start)
+scene = 0
+
+function draw_sprite(xpos, ypos, w, h, spr_start, bg)
 	for x=0,w do
 		for y=0,h do
 			spr(
 				y*16+x+spr_start,
 				xpos + 8 * x,
 				ypos + 8 * y,
-				1
+				bg
 			)
 		end
 	end
@@ -16,7 +18,7 @@ function draw_mountains(d, col)
 		for y=50,99 do
 			rx = x / 240 - .5
 			ry = y / 180 - .5
-			if math.sin((rx+d*10)*10+t*.03/d)*.01*d < ry + rx*.1 then
+			if math.sin((rx+d*10)*10+t*30/d)*.01*d < ry + rx*.1 then
 				pix(x,y,col)
 			end
 		end
@@ -25,7 +27,6 @@ end
 
 function draw_credits(t)
  txt = ""
-	t = t / 1000
 	
 	if t > 14 and t < 17 then
 		draw_sprite(
@@ -59,23 +60,51 @@ function swp_col(id, r, g, b)
 	poke(0x03fc2 + id*3, b)
 end
 
-function TIC()
+function running_ninja(t)
 	cls(2)
-	t = time()
-	phase = math.floor((t*.006)%4)
+	phase = math.floor((t*6)%4)
 	swp_col(13, 30, 40, 30)
 	swp_col(15, 60, 70, 60)
 	draw_mountains(15, 13)
 	draw_mountains(10, 15)
 	--draw ninja
-	x = t*0.01
-	if t > 17000 then
-		x = t*0.01+(t-17000)*0.02
+	x = t*10
+	if t > 17 then
+		x = t*10+(t-17)*20
 	end
-	draw_sprite(x, 77,2,2,phase*3)
+	draw_sprite(x, 77,2,2,phase*3,1)
 	
 	draw_credits(t)
+end
+
+function hash(seed)
+	return math.sin(78.324 * seed)%1
+end
+
+function koi_pond(t)
+	cls(8)
 	
+	for i=0, 16 do
+		xran = hash(i * 42.123)*40
+		yran = hash(i * 352.452)*40
+		x = i%4 * 70 + xran
+		y = math.floor(i/4)*100 + yran - t*8
+		--draw koi
+		draw_sprite(x, y, 2, 3, 96 + 3*(((t+i*.2)*3)%4//1), 0)
+	end
+	
+	for i=0, 10 do
+			x = hash(i * 82.123)*200+10
+			y = hash(i * 75.452)*200+10-100
+			--draw water lily
+			draw_sprite(x, y+t*2, 3, 2, 160, 0)
+	end
+end
+
+function TIC()
+	t = time()/1000
+	koi_pond(t)
+	--running_ninja(t)
 end
 
 colSky = {155, 180, 180}
@@ -84,29 +113,30 @@ colGrass = {188, 165, 63}
 colGround = {68, 60, 54}
 
 function SCN(row)
-	gradient = {0,0,0}
-	--sky
-	if row < 100 then
-		col0 = colSky
-		col1 = colDawn
-		prc = math.max(0, (row - 50) / 50)
-	else
-		col0 = colGrass
-		col1 = colGround
-		prc = math.min((row - 100) / 16, 1)
+	if scene == 1 then
+		gradient = {0,0,0}
+		--sky
+		if row < 100 then
+			col0 = colSky
+			col1 = colDawn
+			prc = math.max(0, (row - 50) / 50)
+		else
+			col0 = colGrass
+			col1 = colGround
+			prc = math.min((row - 100) / 16, 1)
+		end
+		for i=1,3 do
+			gradient[i] = col0[i]+
+				prc*(col1[i]-col0[i])
+		end
+		--r
+		poke(0x03fc0+6, gradient[1])
+		--g
+		poke(0x03fc1+6, gradient[2])
+		--b
+		poke(0x03fc2+6, gradient[3])
 	end
-	for i=1,3 do
-		gradient[i] = col0[i]+
-			prc*(col1[i]-col0[i])
-	end
-	--r
-	poke(0x03fc0+6, gradient[1])
-	--g
-	poke(0x03fc1+6, gradient[2])
-	--b
-	poke(0x03fc2+6, gradient[3])
 end
-
 
 -- <TILES>
 -- 000:1111111111111111111111111111111111111111111111111111111111111111
@@ -181,6 +211,40 @@ end
 -- 089:1111111111111111111111111111111111111111111111111111111111111111
 -- 090:1111111111111111111111111111111111111111111111111111111111111111
 -- 091:1111111111111111111111111111111111111111111111111111111111111111
+-- 097:0000000000000000000000000000ccc000cccc0c00cccccc00ccccc30ccccc33
+-- 098:0000000000000000000000000000000000000000c0000000c000000030000000
+-- 100:000000000000000000cccc000cccccc0c0cccc0cccccccc3cccccc33cccccc33
+-- 103:0000000000000000000000000ccc0000c0cccc00cccccc00ccccc300cccccc30
+-- 106:000000000000000000cccc000cccccc0c0cccc0cccccccc3cccccc33cccccc33
+-- 112:0000000000000033000003330000033300000003000000000000000000000000
+-- 113:3cccccc333cccccc33cccccc33ccc33c3ccc3333cccc33330cccc3300cccccc0
+-- 114:00000000c0000000c0000000cc000000ccc00000ccc000000000000000000000
+-- 115:0000000000000003000000330000033300000333000000000000000000000000
+-- 116:3cccccc333cccccc33cccccc33ccc33c3ccc3333cccc33330cccc3300cccccc0
+-- 117:00000000c0000000cc000000ccc00000ccc00000000000000000000000000000
+-- 118:0000000000000003000000030000003300000333000003330000000000000000
+-- 119:3ccccccc3ccccccc3ccccccc33cccc3c33ccc33333cccc330cccccc003ccccc0
+-- 120:00000000cc000000ccc00000ccc00000c0000000000000000000000000000000
+-- 121:0000000000000003000000330000033300000333000000000000000000000000
+-- 122:3cccccc333cccccc33cccccc33ccc33c3ccc3333cccc33330cccc3300cccccc0
+-- 123:00000000c0000000cc000000ccc00000ccc00000000000000000000000000000
+-- 129:03ccccc0033ccc30003ccc30000cccc00000ccc0000033c3000003c3000000cc
+-- 130:00000000000000000000000000000000000000000000000000000000c0000000
+-- 132:03ccccc0033ccc30033cccc0003ccc00003cc300003cc300003cc000000cc000
+-- 135:03cccc3003cccc300ccccc000cccc0000ccc00003c3300003c300000cc000000
+-- 138:03ccccc0033ccc30033cccc0003ccc00003cc300003cc300003cc000000cc000
+-- 145:0000000c00000000000000000000000000000000000000000000000000000000
+-- 146:c3000000c33000000cc0000000cc000000cc000000cc00000cc000000c000000
+-- 148:000cc000000cc000000ccc000000cc000000cc000000cc00000ccc00000cc000
+-- 150:0000003c0000033c00000cc00000cc000000cc000000cc0000000cc0000000c0
+-- 151:c000000000000000000000000000000000000000000000000000000000000000
+-- 154:000cc000000cc000000ccc000000cc000000cc000000cc00000ccc00000cc000
+-- 160:0000000000000000000000000000077700007777000777770077777700777777
+-- 161:0000000000000000000000007700000077700000777700007770000000000000
+-- 162:0000000000000000000000000077770007777770077777700077770000000000
+-- 176:0077777700777777000777770000777700000777000000000000000000000000
+-- 177:7000000077700000777700007770000077000000000000000000000000000000
+-- 178:00000000007777000777dcd07770c3c70007dcd7007777700077770000000000
 -- </TILES>
 
 -- <WAVES>
